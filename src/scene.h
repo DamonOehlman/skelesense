@@ -14,31 +14,27 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-#ifndef SKELESENSE_H
-#define SKELESENSE_H
+#ifndef KINECT_SCENE_H_
+#define KINECT_SCENE_H_
 
 #include <v8.h>
 #include <node.h>
-#include <node_events.h>
+#include <node_object_wrap.h>
 
-#include <XnCppWrapper.h>
+class Scene : public node::ObjectWrap {
+  public:
+    static v8::Persistent<v8::FunctionTemplate> constructor_template;
+    static v8::Persistent<v8::String> emit_symbol;
 
-using namespace v8;
-using namespace node;
-
-class Scene : public EventEmitter {
-    public:
-      static Persistent<FunctionTemplate> constructor_template;
-      static void Init(v8::Handle<Object> target);
-
-    protected:
-      Scene() : EventEmitter() { }
-
-      ~Scene() {
-        printf("Destroying scene\n");
-      }
-
-      static Handle<Value> New(const Arguments& args);
+    static void Initialize(v8::Handle<v8::Object> target);
+    
+    ~Scene();
+    
+  private:
+    static v8::Handle<v8::Value> New(const v8::Arguments &args);
+    static v8::Handle<v8::Value> Connect(const v8::Arguments &args);
+    
+    Scene();
 };
 
-#endif
+#endif  // KINECT_SCENE_H_

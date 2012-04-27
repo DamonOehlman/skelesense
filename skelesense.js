@@ -1,5 +1,11 @@
-var binding = require('./build/Release/skelesense');
+var skelesense = require('./build/Release/skelesense'),
+    EventEmitter = require('events').EventEmitter,
+    util = require('util');
+    
+util.inherits(skelesense.Scene, EventEmitter);
 
-module.exports = function() {
-    return new binding.Scene();
+exports = module.exports = function() {
+    return new skelesense.Scene();
 };
+
+exports.Scene = skelesense.Scene;
