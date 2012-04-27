@@ -1,0 +1,32 @@
+{
+  "name": "skelesense",
+  "description": "Kinect (OpenNI) Skeleton Data Collector for Node",
+  "author": "Damon Oehlman <damon.oehlman@sidelab.com>",
+  "tags": [
+    "kinect",
+    "openni"
+  ],
+  "version": "0.0.0",
+  "main": "skelesense",
+  "engines": {
+    "node": ">= 0.4.x < 0.7.0"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "expect.js": "0.1.x",
+    "mocha": "1.0.x"
+ },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/DamonOehlman/skelesense.git"
+  },
+  "bugs": {
+    "url": "http://github.com/DamonOehlman/skelesense/issues"
+  },
+  "scripts": {
+    "test": "mocha --reporter spec",
+    "install": "node-waf configure clean build"
+  },
+  "contributors": [],
+  "optionalDependencies": {}
+}
