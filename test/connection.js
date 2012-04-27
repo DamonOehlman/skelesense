@@ -5,9 +5,21 @@ describe('connectivity tests', function() {
         var scene = skelesense();
 
         console.log(skelesense.Scene.prototype);
-        scene.on('connect', done);
         
-        scene.connect();
+        scene.connect(function() {
+            console.log('connected');
+            
+            scene.detectUser(function(user) {
+                console.log('user detected');
+                
+                while (true) {
+                }
+
+                done();
+            });
+        });
+        
+        
         console.log(scene);
     });
 });

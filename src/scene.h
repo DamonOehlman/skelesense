@@ -20,6 +20,13 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <v8.h>
 #include <node.h>
 #include <node_object_wrap.h>
+#include "SkeletonSensor.h"
+
+struct DeviceBaton {
+    uv_work_t request;
+    v8::Persistent<v8::Function> callback;
+    SkeletonSensor *sensor;
+};
 
 class Scene : public node::ObjectWrap {
   public:
@@ -27,14 +34,21 @@ class Scene : public node::ObjectWrap {
     static v8::Persistent<v8::String> emit_symbol;
 
     static void Initialize(v8::Handle<v8::Object> target);
-    
+
     ~Scene();
     
+    static Scene* New();
+    
   private:
+    SkeletonSensor *sensor_;
+    
+    Scene(v8::Handle<v8::Object> wrapper);
+    
+    DeviceBaton* MakeBaton(v8::Persistent<v8::Function> callback);
+      
     static v8::Handle<v8::Value> New(const v8::Arguments &args);
     static v8::Handle<v8::Value> Connect(const v8::Arguments &args);
-    
-    Scene();
+    static v8::Handle<v8::Value> DetectUser(const v8::Arguments &args);
 };
 
 #endif  // KINECT_SCENE_H_

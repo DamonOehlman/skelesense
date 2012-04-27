@@ -11,7 +11,9 @@
   "engines": {
     "node": ">= 0.4.x < 0.7.0"
   },
-  "dependencies": {},
+  "dependencies": {
+    "inherits": "1.0.x"
+  },
   "devDependencies": {
     "expect.js": "0.1.x",
     "mocha": "1.0.x"
