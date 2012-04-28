@@ -20,7 +20,7 @@
 
 using namespace v8;
 
-void DeviceConnect(uv_work_t* req) {
+void DeviceInit(uv_work_t* req) {
     DeviceBaton* baton = static_cast<DeviceBaton*>(req->data);
     
     // initialize the kinect
@@ -42,29 +42,24 @@ void DeviceReady(uv_work_t* req) {
     unsigned argc = 1;
     Local<Value> argv[] = { Local<Value>::New(Undefined()) };
     
+    // if we captured an error, then update the callback parameter
     if (baton->error_message != "") {
         Local<Value> err = Exception::Error(
                 String::New(baton->error_message.c_str()));
                
         argv[0] = err;
     }
+    
+    // fire the callback
     v8::TryCatch try_catch;
         baton->callback->Call(Context::GetCurrent()->Global(), argc, argv);
         if (try_catch.HasCaught()) {
             node::FatalException(try_catch);
         }
         
+    // cleanup
     baton->callback.Dispose();
     delete baton;
-}
-
-inline Handle<Value> CHECK_RC(const unsigned int rc, const char* const description) {
-    if(rc != XN_STATUS_OK) {
-        return ThrowException(v8::Exception::TypeError(
-            v8::String::New(xnGetStatusString(rc))));
-    }
-
-    return Null();
 }
 
 Persistent<FunctionTemplate> Scene::constructor_template;
@@ -88,11 +83,7 @@ Handle<Value> Scene::New(const Arguments &args) {
     HandleScope scope;
     Scene * scene = new Scene(args.This());
     
-    // ev_async_init(scene->completed_, Scene::Complete);
-    // ev_async_start(EV_DEFAULT_UC_ scene->completed_);
-    // ev_unref(EV_DEFAULT_UC);
-    
-    return args.This();
+    return scope.Close(args.This());
 }
 
 Scene::Scene(Handle<Object> wrapper) : ObjectWrap() {
@@ -101,48 +92,34 @@ Scene::Scene(Handle<Object> wrapper) : ObjectWrap() {
   sensor_ = new SkeletonSensor();
 }
 
-Handle<Value> Scene::Init(const Arguments &args) {
+Handle<Value> Scene::Async(const Arguments &args, uv_work_cb work_cb) {
     HandleScope scope;
     if (args.Length() < 1) {
         return ThrowException(v8::Exception::TypeError(v8::String::New("Must provide a callback")));
     }
     
+    // unwrap the scene object
     Scene *scene = ObjectWrap::Unwrap<Scene>(args.This());
 
+    // create the baton to pass stuff around with
+    DeviceBaton *baton = new DeviceBaton();
+    baton->request.data = baton;
+    baton->sensor = scene->sensor_;
+    baton->callback = Persistent<Function>::New(Local<Function>::Cast(args[0]));
+
     // This creates our work request, including the libuv struct.
-    DeviceBaton* baton = scene->MakeBaton(Persistent<Function>::New(Local<Function>::Cast(args[0])));
-    
-    int status = uv_queue_work(uv_default_loop(), &baton->request, DeviceConnect, DeviceReady);
+    int status = uv_queue_work(uv_default_loop(), &baton->request, work_cb, DeviceReady);
     assert(status == 0);
   
-    return Undefined();
+    return scope.Close(Undefined());
+}
+
+Handle<Value> Scene::Init(const Arguments &args) {
+    return Async(args, DeviceInit);
 }
 
 Handle<Value> Scene::DetectUser(const Arguments &args) {
-    HandleScope scope;
-    if (args.Length() < 1) {
-        return ThrowException(v8::Exception::TypeError(v8::String::New("Must provide a callback")));
-    }
-    
-    Scene *scene = ObjectWrap::Unwrap<Scene>(args.This());
-
-    // This creates our work request, including the libuv struct.
-    DeviceBaton* baton = scene->MakeBaton(Persistent<Function>::New(Local<Function>::Cast(args[0])));
-
-    int status = uv_queue_work(uv_default_loop(), &baton->request, DeviceUserConnect, DeviceReady);
-    assert(status == 0);
-  
-    return Undefined();
-}
-
-DeviceBaton* Scene::MakeBaton(Persistent<Function> callback) {
-    DeviceBaton *baton = new DeviceBaton();
-
-    baton->request.data = baton;
-    baton->sensor = sensor_;
-    baton->callback = callback;
-    
-    return baton;
+    return Async(args, DeviceUserConnect);
 }
 
 void Scene::Initialize(Handle<Object> target) {

@@ -46,9 +46,8 @@ class Scene : public node::ObjectWrap {
     
     Scene(v8::Handle<v8::Object> wrapper);
     
-    DeviceBaton* MakeBaton(v8::Persistent<v8::Function> callback);
-      
     static v8::Handle<v8::Value> New(const v8::Arguments &args);
+    static v8::Handle<v8::Value> Async(const v8::Arguments &args, uv_work_cb work_cb);
     static v8::Handle<v8::Value> Init(const v8::Arguments &args);
     static v8::Handle<v8::Value> DetectUser(const v8::Arguments &args);
 };
