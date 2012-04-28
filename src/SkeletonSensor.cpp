@@ -4,8 +4,7 @@
 #include <string>
 #include <sstream>
 
-inline std::string CHECK_RC(const unsigned int rc, const char* const description)
-{
+inline std::string CHECK_RC(const unsigned int rc, const char* const description) {
     if(rc != XN_STATUS_OK) {
         std::ostringstream msg;
         
@@ -33,7 +32,7 @@ std::string SkeletonSensor::initialize()
     XnStatus rc = XN_STATUS_OK;
     std::string lastError;
 
-    rc = context_.Init(); // InitFromXmlFile("config/skelesense.xml");
+    rc = context_.InitFromXmlFile("config/skelesense.xml");
         
     // create depth and user generators
     lastError = CHECK_RC(depthG_.Create(context_), "Create depth generator");
@@ -56,20 +55,14 @@ std::string SkeletonSensor::initialize()
     depthG_.SetMapOutputMode(mapMode);
     imageG_.SetMapOutputMode(mapMode);
     
-    /*
-
     // turn on device mirroring
-    if(depthG_.IsCapabilitySupported("Mirror") == true)
-    {
-        rc = depthG_.GetMirrorCap().SetMirror(true);
-        CHECK_RC(rc, "Setting Image Mirroring on depthG", lastError);
+    if(depthG_.IsCapabilitySupported("Mirror") == true) {
+        CHECK_RC(depthG_.GetMirrorCap().SetMirror(true), "Setting Image Mirroring on depthG");
     }
     
     // turn on device mirroring
-    if(imageG_.IsCapabilitySupported("Mirror") == true)
-    {
-        rc = imageG_.GetMirrorCap().SetMirror(true);
-        CHECK_RC(rc, "Setting Image Mirroring on imageG", lastError);
+    if(imageG_.IsCapabilitySupported("Mirror") == true) {
+        CHECK_RC(imageG_.GetMirrorCap().SetMirror(true), "Setting Image Mirroring on imageG");
     }
 
     // make sure the user points are reported from the POV of the depth generator
@@ -84,7 +77,6 @@ std::string SkeletonSensor::initialize()
 
     // setup callbacks
     setCalibrationPoseCallbacks();
-    */
 
     return "";
 }

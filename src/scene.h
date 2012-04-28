@@ -21,61 +21,56 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <node.h>
 #include <node_object_wrap.h>
 #include <string>
+
 #include <XnCppWrapper.h>
-
-
-/*
-struct DeviceBaton {
-    uv_work_t request;
-    v8::Persistent<v8::Function> callback;
-    
-    SkeletonSensor *sensor;
-    std::string error_message;
-};
-*/
-
-struct ContextBaton {
-    uv_work_t request;
-    v8::Persistent<v8::Function> callback;
-    
-    xn::Context context;
-    std::string error_message;
-}
-
-struct UserBaton {
-    uv_work_t request;
-    v8::Persistent<v8::Function> callback;
-    
-    xn::Context context;
-    xn::UserGenerator gen;
-    std::string error_message;
-}
+#include "SkeletonSensor.h"
 
 class Scene : public node::ObjectWrap {
   public:
+    bool active;
+    xn::Context context;
+    xn::UserGenerator usergen;
+    xn::DepthGenerator depthgen;
+    xn::ImageGenerator imagegen;
+    SkeletonSensor *sensor;
+    
+    Skeleton users[];
+    unsigned userCount;
+
     static v8::Persistent<v8::FunctionTemplate> constructor_template;
-    static v8::Persistent<v8::String> emit_symbol;
 
     static void Initialize(v8::Handle<v8::Object> target);
+    
+    // void Emit(int argc, v8::Handle<v8::Object> argv[]);
 
     ~Scene();
     
     static Scene* New();
     
   protected:
-    static v8::Handle<v8::Value> WithContext(const v8::Arguments &args, uv_work_cb work_cb);
+    static v8::Handle<v8::Value> Async(const v8::Arguments &args, uv_work_cb work_cb, uv_after_work_cb after_work_cb, std::string task);
     
   private:
-    // SkeletonSensor *sensor_;
-    xn::Context context_;
-    
     Scene(v8::Handle<v8::Object> wrapper);
     
     static v8::Handle<v8::Value> New(const v8::Arguments &args);
-    //static v8::Handle<v8::Value> Async(const v8::Arguments &args, uv_work_cb work_cb);
-    //static v8::Handle<v8::Value> Init(const v8::Arguments &args);
+    static v8::Handle<v8::Value> Capture(const v8::Arguments &args);
+    static v8::Handle<v8::Value> CreateDepthGenerator(const v8::Arguments &args);
+    static v8::Handle<v8::Value> CreateImageGenerator(const v8::Arguments &args);
+    static v8::Handle<v8::Value> CreateUserGenerator(const v8::Arguments &args);
+    static v8::Handle<v8::Value> StartSensor(const v8::Arguments &args);
+    static v8::Handle<v8::Value> WatchForUsers(const v8::Arguments &args);
     static v8::Handle<v8::Value> InitContext(const v8::Arguments &args);
-    //static v8::Handle<v8::Value> DetectUser(const v8::Arguments &args);
+};
+
+struct SceneBaton {
+    uv_work_t request;
+    v8::Persistent<v8::Function> callback;
+    
+    Scene *scene;
+    
+    std::string task;
+    std::string error_message;
 };
 
 #endif  // KINECT_SCENE_H_

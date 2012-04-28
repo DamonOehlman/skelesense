@@ -6,8 +6,19 @@ scene.init(function(err) {
     console.log('connected', err, err instanceof Error);
     
     if (! err) {
-        scene.detectUser(function(user) {
+        scene.capture();
+        
+        console.log('capturing');
+        /*
+        scene.watchForUsers(function() {
+            console.log('watching for users');
+        });
+        
+        scene.on('newuser', function() {
             console.log('user detected');
         });
+        */
+        
+        // process.stdin.resume();
     }
 });

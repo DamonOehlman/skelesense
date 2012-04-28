@@ -17,36 +17,76 @@
 
 #include "scene.h"
 #include "nitools.h"
+#include "SkeletonSensor.h"
+
+static v8::Persistent<v8::String> emit_symbol = NODE_PSYMBOL("emit");
 
 using namespace v8;
 
-/*
-void DeviceInit(uv_work_t* req) {
-    DeviceBaton* baton = static_cast<DeviceBaton*>(req->data);
+/* openni callbacks */
+
+void XN_CALLBACK_TYPE newUserCallback(xn::UserGenerator& generator, XnUserID nId, void* pCookie) {
+    Scene* scene = static_cast<Scene*>(pCookie);
     
-    // initialize the kinect
-    baton->error_message = baton->sensor->initialize();
-    // baton->sensor->setPointModeToProjective();
+    Local<Value> argv[] = { String::New("newuser"), Integer::New(nId) };
+    Local<Value> emit_v = scene->handle_->Get(emit_symbol);
+    
+    if (emit_v->IsFunction()) {
+        Local<Function> emit = Local<Function>::Cast(emit_v);
+
+        // fire the callback
+        v8::TryCatch try_catch;
+        emit->Call(Context::GetCurrent()->Global(), 2, argv);
+        if (try_catch.HasCaught()) {
+            node::FatalException(try_catch);
+        }
+    }
+    
+    scene->usergen.GetSkeletonCap().RequestCalibration(nId, true);
 }
 
-void DeviceUserConnect(uv_work_t* req) {
-    DeviceBaton* baton = static_cast<DeviceBaton*>(req->data);
-    
-    // initialize the kinect
-    baton->sensor->waitForDeviceUpdateOnUser();
-}
-*/
-
-void ContextInit(uv_work_t* req) {
-    ContextBaton* baton = static_cast<ContextBaton*>(req->data);
-    
-    // initialize the kinect
-    baton->error_message = CHECK_RC(baton->context.Init(), "Initializing Context");
+void XN_CALLBACK_TYPE lostUserCallback(xn::UserGenerator& generator, XnUserID nId, void* pCookie) {
+    // put_flog(LOG_DEBUG, "Lost user %d", nId);
 }
 
-void ContextReady(uv_work_t* req) {
+void XN_CALLBACK_TYPE calibrationStartCallback(xn::SkeletonCapability& capability, XnUserID nId, void* pCookie) {
+    // put_flog(LOG_DEBUG, "Calibration started for user %d", nId);
+}
+
+void XN_CALLBACK_TYPE calibrationCompleteCallback(xn::SkeletonCapability& capability, XnUserID nId, XnCalibrationStatus eStatus, void* pCookie) {
+    Scene* scene = static_cast<Scene*>(pCookie);
+    
+    if(eStatus == XN_CALIBRATION_STATUS_OK) {
+        // put_flog(LOG_DEBUG, "Calibration completed: start tracking user %d", nId);
+        scene->usergen.GetSkeletonCap().StartTracking(nId);
+    }
+    else {
+        // put_flog(LOG_DEBUG, "Calibration failed for user %d", nId);
+        scene->usergen.GetSkeletonCap().RequestCalibration(nId, true);
+    }
+}
+
+/* async workers */
+
+void capture(uv_work_t* req) {
+  SceneBaton* baton = static_cast<SceneBaton*>(req->data);
+  Scene* scene = baton->scene;
+  SkeletonSensor* sensor = scene->sensor;
+  
+  sensor->waitForDeviceUpdateOnUser();
+  
+  scene->userCount = sensor->getNumTrackedUsers();
+  for (int ii = 0; ii < scene->userCount; ii++) {
+      scene->users[ii] =  sensor->getSkeleton(sensor->getUID(ii));
+  }
+  
+  // initialize the kinect
+  // baton->error_message = CHECK_RC(baton->scene->context.InitFromXmlFile("config/skelesense.xml"), baton->task.c_str());
+}
+
+void captureResult(uv_work_t* req) {
     HandleScope scope;
-    ContextBaton* baton = static_cast<ContextBaton*>(req->data);
+    SceneBaton* baton = static_cast<SceneBaton*>(req->data);
     
     unsigned argc = 1;
     Local<Value> argv[] = { Local<Value>::New(Undefined()) };
@@ -71,10 +111,112 @@ void ContextReady(uv_work_t* req) {
     delete baton;
 }
 
-/*
-void DeviceReady(uv_work_t* req) {
+void initContext(uv_work_t* req) {
+  SceneBaton* baton = static_cast<SceneBaton*>(req->data);
+  Scene* scene = baton->scene;
+  
+  baton->error_message = scene->sensor->initialize();
+  scene->sensor->setPointModeToProjective();
+
+  // initialize the kinect
+  // baton->error_message = CHECK_RC(baton->scene->context.InitFromXmlFile("config/skelesense.xml"), baton->task.c_str());
+}
+
+void createDepthGen(uv_work_t* req) {
+    SceneBaton* baton = static_cast<SceneBaton*>(req->data);
+    Scene* scene = baton->scene;
+
+    // initialize the kinect
+    baton->error_message = CHECK_RC(scene->depthgen.Create(scene->context), baton->task.c_str());
+}
+
+void createImageGen(uv_work_t* req) {
+    SceneBaton* baton = static_cast<SceneBaton*>(req->data);
+    Scene* scene = baton->scene;
+
+    // initialize the kinect
+    baton->error_message = CHECK_RC(scene->imagegen.Create(scene->context), baton->task.c_str());
+}
+
+void createUserGen(uv_work_t* req) {
+    SceneBaton* baton = static_cast<SceneBaton*>(req->data);
+    Scene* scene = baton->scene;
+
+    // initialize the kinect
+    baton->error_message = CHECK_RC(scene->usergen.Create(scene->context), baton->task.c_str());
+}
+
+void startSensor(uv_work_t* req) {
+    SceneBaton* baton = static_cast<SceneBaton*>(req->data);
+    Scene* scene = baton->scene;
+
+    XnMapOutputMode mapMode;
+    scene->depthgen.GetMapOutputMode(mapMode);
+
+    // for now, make output map VGA resolution at 30 FPS
+    mapMode.nXRes = XN_VGA_X_RES;
+    mapMode.nYRes = XN_VGA_Y_RES;
+    mapMode.nFPS  = 30;
+
+    scene->depthgen.SetMapOutputMode(mapMode);
+    scene->imagegen.SetMapOutputMode(mapMode);
+    
+    // turn on device mirroring
+    if(scene->depthgen.IsCapabilitySupported("Mirror") == true) {
+        baton->error_message = CHECK_RC(scene->depthgen.GetMirrorCap().SetMirror(true), baton->task.c_str());
+    }
+    
+    // turn on device mirroring
+    if(scene->imagegen.IsCapabilitySupported("Mirror") == true) {
+        baton->error_message = CHECK_RC(scene->imagegen.GetMirrorCap().SetMirror(true), baton->task.c_str());
+    }
+
+    // make sure the user points are reported from the POV of the depth generator
+    scene->usergen.GetAlternativeViewPointCap().SetViewPoint(scene->depthgen);
+    scene->depthgen.GetAlternativeViewPointCap().SetViewPoint(scene->imagegen);
+
+    // set smoothing factor
+    scene->usergen.GetSkeletonCap().SetSmoothing(0.9);
+
+    // start data streams
+    scene->context.StartGeneratingAll();
+}
+
+void watchForUsers(uv_work_t* req) {
+    SceneBaton* baton = static_cast<SceneBaton*>(req->data);
+    Scene* scene = baton->scene;
+
+    XnCallbackHandle hUserCallbacks, hCalibrationStart, hCalibrationComplete;
+    
+    // start data streams
+    scene->context.StartGeneratingAll();
+
+    scene->usergen.RegisterUserCallbacks(
+        newUserCallback, 
+        lostUserCallback, 
+        scene, 
+        hUserCallbacks
+    );
+    
+    scene->usergen.GetSkeletonCap().RegisterToCalibrationStart(
+        calibrationStartCallback, 
+        scene,
+        hCalibrationStart
+    );
+    
+    scene->usergen.GetSkeletonCap().RegisterToCalibrationComplete(
+        calibrationCompleteCallback, 
+        scene, 
+        hCalibrationComplete
+    );
+
+    // turn on tracking of all joints
+    scene->usergen.GetSkeletonCap().SetSkeletonProfile(XN_SKEL_PROFILE_ALL);
+}
+
+void errorCheck(uv_work_t* req) {
     HandleScope scope;
-    DeviceBaton* baton = static_cast<DeviceBaton*>(req->data);
+    SceneBaton* baton = static_cast<SceneBaton*>(req->data);
     
     unsigned argc = 1;
     Local<Value> argv[] = { Local<Value>::New(Undefined()) };
@@ -98,18 +240,18 @@ void DeviceReady(uv_work_t* req) {
     baton->callback.Dispose();
     delete baton;
 }
-*/
 
 Persistent<FunctionTemplate> Scene::constructor_template;
 
 Scene::~Scene() {
+    context.Shutdown();
 }
 
 Scene* Scene::New() {
   HandleScope scope;
 
   Local<Object> scene = constructor_template->GetFunction()->NewInstance();
-
+  
   return ObjectWrap::Unwrap<Scene>(scene);
 }
 
@@ -119,7 +261,7 @@ Handle<Value> Scene::New(const Arguments &args) {
     }
     
     HandleScope scope;
-    new Scene(args.This());
+    Scene *scene = new Scene(args.This());
     
     return scope.Close(args.This());
 }
@@ -127,10 +269,11 @@ Handle<Value> Scene::New(const Arguments &args) {
 Scene::Scene(Handle<Object> wrapper) : ObjectWrap() {
   Wrap(wrapper);
   
-  // sensor_ = new SkeletonSensor();
+  sensor = new SkeletonSensor();
+  active = TRUE;
 }
 
-Handle<Value> Scene::WithContext(const Arguments &args, uv_work_cb work_cb) {
+Handle<Value> Scene::Async(const Arguments &args, uv_work_cb work_cb, uv_after_work_cb after_work_cb, std::string task) {
     HandleScope scope;
     if (args.Length() < 1) {
         return ThrowException(v8::Exception::TypeError(v8::String::New("Must provide a callback")));
@@ -140,70 +283,85 @@ Handle<Value> Scene::WithContext(const Arguments &args, uv_work_cb work_cb) {
     Scene *scene = ObjectWrap::Unwrap<Scene>(args.This());
 
     // create the baton to pass stuff around with
-    ContextBaton *baton = new ContextBaton();
+    SceneBaton *baton = new SceneBaton();
     baton->request.data = baton;
-    baton->context = scene->context_;
+    baton->scene = scene;
+    baton->task = task;
     baton->callback = Persistent<Function>::New(Local<Function>::Cast(args[0]));
 
     // This creates our work request, including the libuv struct.
-    int status = uv_queue_work(uv_default_loop(), &baton->request, work_cb, ContextReady);
+    int status = uv_queue_work(uv_default_loop(), &baton->request, work_cb, after_work_cb);
     assert(status == 0);
   
     return scope.Close(Undefined());
 }
 
 /*
-Handle<Value> Scene::Async(const Arguments &args, uv_work_cb work_cb) {
+void Scene::Emit(int argc, Handle<Object> argv[]) {
     HandleScope scope;
-    if (args.Length() < 1) {
-        return ThrowException(v8::Exception::TypeError(v8::String::New("Must provide a callback")));
+    Local<Value> emit_v = handle_->Get(emit_symbol);
+
+    if (emit_v->IsFunction()) {
+        Local<Function> emit = Local<Function>::Cast(emit_v);
+
+        // fire the callback
+        v8::TryCatch try_catch;
+        emit->Call(Context::GetCurrent()->Global(), 2, argv);
+        if (try_catch.HasCaught()) {
+            node::FatalException(try_catch);
+        }
     }
     
-    // unwrap the scene object
-    Scene *scene = ObjectWrap::Unwrap<Scene>(args.This());
-
-    // create the baton to pass stuff around with
-    DeviceBaton *baton = new DeviceBaton();
-    baton->request.data = baton;
-    baton->sensor = scene->sensor_;
-    baton->callback = Persistent<Function>::New(Local<Function>::Cast(args[0]));
-
-    // This creates our work request, including the libuv struct.
-    int status = uv_queue_work(uv_default_loop(), &baton->request, work_cb, DeviceReady);
-    assert(status == 0);
-  
-    return scope.Close(Undefined());
+    scope.Close(Undefined());
 }
 */
+
+Handle<Value> Scene::Capture(const Arguments &args) {
+    return Async(args, capture, captureResult, "Capturing User Input");
+}
+
+Handle<Value> Scene::CreateDepthGenerator(const Arguments &args) {
+    return Async(args, createDepthGen, errorCheck, "Creating Depth Generator");
+}
+
+Handle<Value> Scene::CreateImageGenerator(const Arguments &args) {
+    return Async(args, createImageGen, errorCheck, "Creating Image Generator");
+}
+
+Handle<Value> Scene::CreateUserGenerator(const Arguments &args) {
+    return Async(args, createUserGen, errorCheck, "Creating User Generator");
+}
 
 Handle<Value> Scene::InitContext(const Arguments &args) {
-    return WithContext(args, ContextInit);
+    return Async(args, initContext, errorCheck, "Initializing Context");
 }
 
-/*
-Handle<Value> Scene::Init(const Arguments &args) {
-    return Async(args, DeviceInit);
+Handle<Value> Scene::StartSensor(const Arguments &args) {
+    return Async(args, startSensor, errorCheck, "Starting Sensor");
 }
 
-Handle<Value> Scene::DetectUser(const Arguments &args) {
-    return Async(args, DeviceUserConnect);
+Handle<Value> Scene::WatchForUsers(const Arguments &args) {
+    return Async(args, watchForUsers, errorCheck, "Watching for Users");
 }
-*/
 
 void Scene::Initialize(Handle<Object> target) {
   HandleScope scope;
-
-  // length_symbol = Persistent<String>::New(String::NewSymbol("length"));
-  // chars_written_sym = Persistent<String>::New(String::NewSymbol("_charsWritten"));
-
+  
   Local<FunctionTemplate> t = FunctionTemplate::New(Scene::New);
   constructor_template = Persistent<FunctionTemplate>::New(t);
   constructor_template->InstanceTemplate()->SetInternalFieldCount(1);
   constructor_template->SetClassName(String::NewSymbol("Scene"));
 
   NODE_SET_PROTOTYPE_METHOD(constructor_template, "_init", Scene::InitContext);
+  NODE_SET_PROTOTYPE_METHOD(constructor_template, "_createUserGenerator", Scene::CreateUserGenerator);
+  NODE_SET_PROTOTYPE_METHOD(constructor_template, "_createDepthGenerator", Scene::CreateDepthGenerator);
+  NODE_SET_PROTOTYPE_METHOD(constructor_template, "_createImageGenerator", Scene::CreateImageGenerator);
+  NODE_SET_PROTOTYPE_METHOD(constructor_template, "_start", Scene::StartSensor);
+  NODE_SET_PROTOTYPE_METHOD(constructor_template, "_capture", Scene::Capture);
+  NODE_SET_PROTOTYPE_METHOD(constructor_template, "watchForUsers", Scene::WatchForUsers);
+
   // NODE_SET_PROTOTYPE_METHOD(constructor_template, "detectUser", Scene::DetectUser);
   target->Set(String::NewSymbol("Scene"), constructor_template->GetFunction());
-  
+
   scope.Close(Undefined());
 }
