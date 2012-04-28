@@ -16,10 +16,11 @@
 #endif
 
 #include "scene.h"
-#include "SkeletonSensor.h"
+#include "nitools.h"
 
 using namespace v8;
 
+/*
 void DeviceInit(uv_work_t* req) {
     DeviceBaton* baton = static_cast<DeviceBaton*>(req->data);
     
@@ -34,7 +35,43 @@ void DeviceUserConnect(uv_work_t* req) {
     // initialize the kinect
     baton->sensor->waitForDeviceUpdateOnUser();
 }
+*/
 
+void ContextInit(uv_work_t* req) {
+    ContextBaton* baton = static_cast<ContextBaton*>(req->data);
+    
+    // initialize the kinect
+    baton->error_message = CHECK_RC(baton->context.Init(), "Initializing Context");
+}
+
+void ContextReady(uv_work_t* req) {
+    HandleScope scope;
+    ContextBaton* baton = static_cast<ContextBaton*>(req->data);
+    
+    unsigned argc = 1;
+    Local<Value> argv[] = { Local<Value>::New(Undefined()) };
+    
+    // if we captured an error, then update the callback parameter
+    if (baton->error_message != "") {
+        Local<Value> err = Exception::Error(
+                String::New(baton->error_message.c_str()));
+               
+        argv[0] = err;
+    }
+    
+    // fire the callback
+    v8::TryCatch try_catch;
+        baton->callback->Call(Context::GetCurrent()->Global(), argc, argv);
+        if (try_catch.HasCaught()) {
+            node::FatalException(try_catch);
+        }
+        
+    // cleanup
+    baton->callback.Dispose();
+    delete baton;
+}
+
+/*
 void DeviceReady(uv_work_t* req) {
     HandleScope scope;
     DeviceBaton* baton = static_cast<DeviceBaton*>(req->data);
@@ -61,6 +98,7 @@ void DeviceReady(uv_work_t* req) {
     baton->callback.Dispose();
     delete baton;
 }
+*/
 
 Persistent<FunctionTemplate> Scene::constructor_template;
 
@@ -81,7 +119,7 @@ Handle<Value> Scene::New(const Arguments &args) {
     }
     
     HandleScope scope;
-    Scene * scene = new Scene(args.This());
+    new Scene(args.This());
     
     return scope.Close(args.This());
 }
@@ -89,9 +127,32 @@ Handle<Value> Scene::New(const Arguments &args) {
 Scene::Scene(Handle<Object> wrapper) : ObjectWrap() {
   Wrap(wrapper);
   
-  sensor_ = new SkeletonSensor();
+  // sensor_ = new SkeletonSensor();
 }
 
+Handle<Value> Scene::WithContext(const Arguments &args, uv_work_cb work_cb) {
+    HandleScope scope;
+    if (args.Length() < 1) {
+        return ThrowException(v8::Exception::TypeError(v8::String::New("Must provide a callback")));
+    }
+    
+    // unwrap the scene object
+    Scene *scene = ObjectWrap::Unwrap<Scene>(args.This());
+
+    // create the baton to pass stuff around with
+    ContextBaton *baton = new ContextBaton();
+    baton->request.data = baton;
+    baton->context = scene->context_;
+    baton->callback = Persistent<Function>::New(Local<Function>::Cast(args[0]));
+
+    // This creates our work request, including the libuv struct.
+    int status = uv_queue_work(uv_default_loop(), &baton->request, work_cb, ContextReady);
+    assert(status == 0);
+  
+    return scope.Close(Undefined());
+}
+
+/*
 Handle<Value> Scene::Async(const Arguments &args, uv_work_cb work_cb) {
     HandleScope scope;
     if (args.Length() < 1) {
@@ -113,7 +174,13 @@ Handle<Value> Scene::Async(const Arguments &args, uv_work_cb work_cb) {
   
     return scope.Close(Undefined());
 }
+*/
 
+Handle<Value> Scene::InitContext(const Arguments &args) {
+    return WithContext(args, ContextInit);
+}
+
+/*
 Handle<Value> Scene::Init(const Arguments &args) {
     return Async(args, DeviceInit);
 }
@@ -121,6 +188,7 @@ Handle<Value> Scene::Init(const Arguments &args) {
 Handle<Value> Scene::DetectUser(const Arguments &args) {
     return Async(args, DeviceUserConnect);
 }
+*/
 
 void Scene::Initialize(Handle<Object> target) {
   HandleScope scope;
@@ -133,8 +201,8 @@ void Scene::Initialize(Handle<Object> target) {
   constructor_template->InstanceTemplate()->SetInternalFieldCount(1);
   constructor_template->SetClassName(String::NewSymbol("Scene"));
 
-  NODE_SET_PROTOTYPE_METHOD(constructor_template, "init", Scene::Init);
-  NODE_SET_PROTOTYPE_METHOD(constructor_template, "detectUser", Scene::DetectUser);
+  NODE_SET_PROTOTYPE_METHOD(constructor_template, "_init", Scene::InitContext);
+  // NODE_SET_PROTOTYPE_METHOD(constructor_template, "detectUser", Scene::DetectUser);
   target->Set(String::NewSymbol("Scene"), constructor_template->GetFunction());
   
   scope.Close(Undefined());

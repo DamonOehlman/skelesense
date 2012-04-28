@@ -20,8 +20,11 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <v8.h>
 #include <node.h>
 #include <node_object_wrap.h>
-#include "SkeletonSensor.h"
+#include <string>
+#include <XnCppWrapper.h>
 
+
+/*
 struct DeviceBaton {
     uv_work_t request;
     v8::Persistent<v8::Function> callback;
@@ -29,6 +32,24 @@ struct DeviceBaton {
     SkeletonSensor *sensor;
     std::string error_message;
 };
+*/
+
+struct ContextBaton {
+    uv_work_t request;
+    v8::Persistent<v8::Function> callback;
+    
+    xn::Context context;
+    std::string error_message;
+}
+
+struct UserBaton {
+    uv_work_t request;
+    v8::Persistent<v8::Function> callback;
+    
+    xn::Context context;
+    xn::UserGenerator gen;
+    std::string error_message;
+}
 
 class Scene : public node::ObjectWrap {
   public:
@@ -41,15 +62,20 @@ class Scene : public node::ObjectWrap {
     
     static Scene* New();
     
+  protected:
+    static v8::Handle<v8::Value> WithContext(const v8::Arguments &args, uv_work_cb work_cb);
+    
   private:
-    SkeletonSensor *sensor_;
+    // SkeletonSensor *sensor_;
+    xn::Context context_;
     
     Scene(v8::Handle<v8::Object> wrapper);
     
     static v8::Handle<v8::Value> New(const v8::Arguments &args);
-    static v8::Handle<v8::Value> Async(const v8::Arguments &args, uv_work_cb work_cb);
-    static v8::Handle<v8::Value> Init(const v8::Arguments &args);
-    static v8::Handle<v8::Value> DetectUser(const v8::Arguments &args);
+    //static v8::Handle<v8::Value> Async(const v8::Arguments &args, uv_work_cb work_cb);
+    //static v8::Handle<v8::Value> Init(const v8::Arguments &args);
+    static v8::Handle<v8::Value> InitContext(const v8::Arguments &args);
+    //static v8::Handle<v8::Value> DetectUser(const v8::Arguments &args);
 };
 
 #endif  // KINECT_SCENE_H_

@@ -3,7 +3,7 @@ var skelesense = require('../'),
 
 console.log('attempting connection');
 scene.init(function(err) {
-    console.log('connected', err);
+    console.log('connected', err, err instanceof Error);
     
     if (! err) {
         scene.detectUser(function(user) {
