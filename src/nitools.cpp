@@ -1,6 +1,6 @@
 #include <sstream>
 
-inline std::string CHECK_RC(const unsigned int rc, const char* const description) {
+std::string CHECK_RC(const unsigned int rc, const char* const description) {
     if(rc != XN_STATUS_OK) {
         std::ostringstream msg;
         
