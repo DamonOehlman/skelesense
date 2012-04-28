@@ -24,10 +24,8 @@ void DeviceConnect(uv_work_t* req) {
     DeviceBaton* baton = static_cast<DeviceBaton*>(req->data);
     
     // initialize the kinect
-    baton->sensor->initialize();
-    baton->sensor->setPointModeToProjective();
-    
-    // SpeakThisText(baton->toSay.c_str(),strlen(baton->toSay.c_str()));
+    baton->error_message = baton->sensor->initialize();
+    // baton->sensor->setPointModeToProjective();
 }
 
 void DeviceUserConnect(uv_work_t* req) {
@@ -41,11 +39,15 @@ void DeviceReady(uv_work_t* req) {
     HandleScope scope;
     DeviceBaton* baton = static_cast<DeviceBaton*>(req->data);
     
-    const unsigned argc = 2;
-    Local<Value> argv[argc] = {
-        Local<Value>::New(Null()),
-        Local<Value>::New(Null())
-    };
+    unsigned argc = 1;
+    Local<Value> argv[] = { Local<Value>::New(Undefined()) };
+    
+    if (baton->error_message != "") {
+        Local<Value> err = Exception::Error(
+                String::New(baton->error_message.c_str()));
+               
+        argv[0] = err;
+    }
     v8::TryCatch try_catch;
         baton->callback->Call(Context::GetCurrent()->Global(), argc, argv);
         if (try_catch.HasCaught()) {
@@ -99,7 +101,7 @@ Scene::Scene(Handle<Object> wrapper) : ObjectWrap() {
   sensor_ = new SkeletonSensor();
 }
 
-Handle<Value> Scene::Connect(const Arguments &args) {
+Handle<Value> Scene::Init(const Arguments &args) {
     HandleScope scope;
     if (args.Length() < 1) {
         return ThrowException(v8::Exception::TypeError(v8::String::New("Must provide a callback")));
@@ -109,7 +111,7 @@ Handle<Value> Scene::Connect(const Arguments &args) {
 
     // This creates our work request, including the libuv struct.
     DeviceBaton* baton = scene->MakeBaton(Persistent<Function>::New(Local<Function>::Cast(args[0])));
-
+    
     int status = uv_queue_work(uv_default_loop(), &baton->request, DeviceConnect, DeviceReady);
     assert(status == 0);
   
@@ -154,7 +156,9 @@ void Scene::Initialize(Handle<Object> target) {
   constructor_template->InstanceTemplate()->SetInternalFieldCount(1);
   constructor_template->SetClassName(String::NewSymbol("Scene"));
 
-  NODE_SET_PROTOTYPE_METHOD(constructor_template, "connect", Scene::Connect);
+  NODE_SET_PROTOTYPE_METHOD(constructor_template, "init", Scene::Init);
   NODE_SET_PROTOTYPE_METHOD(constructor_template, "detectUser", Scene::DetectUser);
   target->Set(String::NewSymbol("Scene"), constructor_template->GetFunction());
+  
+  scope.Close(Undefined());
 }

@@ -1,16 +1,20 @@
 
 #include "SkeletonSensor.h"
 #include "log.h"
+#include <string>
+#include <sstream>
 
-inline int CHECK_RC(const unsigned int rc, const char* const description)
+inline std::string CHECK_RC(const unsigned int rc, const char* const description)
 {
-    if(rc != XN_STATUS_OK)
-    {
-        put_flog(LOG_ERROR, "%s failed: %s", description, xnGetStatusString(rc));
-        return -1;
+    if(rc != XN_STATUS_OK) {
+        std::ostringstream msg;
+        
+        msg << description << " failed: " << xnGetStatusString(rc);
+        
+        return msg.str();
     }
 
-    return 0;
+    return "";
 }
 
 SkeletonSensor::SkeletonSensor()
@@ -23,27 +27,23 @@ SkeletonSensor::~SkeletonSensor()
     context_.Shutdown();
 }
 
-int SkeletonSensor::initialize()
+std::string SkeletonSensor::initialize()
 {
-    context_.Init();
-
+    // reset statuses
     XnStatus rc = XN_STATUS_OK;
+    std::string lastError;
 
-    // create depth and user generators
-    rc = depthG_.Create(context_);
-
-    if(CHECK_RC(rc, "Create depth generator") == -1)
-        return -1;
-
-    rc = userG_.Create(context_);
-
-    if(CHECK_RC(rc, "Create user generator") == -1)
-        return -1;
+    rc = context_.Init(); // InitFromXmlFile("config/skelesense.xml");
         
-    rc = imageG_.Create(context_);
-    
-     if(CHECK_RC(rc, "Create image generator") == -1)
-        return -1;
+    // create depth and user generators
+    lastError = CHECK_RC(depthG_.Create(context_), "Create depth generator");
+    if (lastError != "") return lastError;
+
+    lastError = CHECK_RC(userG_.Create(context_), "Create user generator");
+    if (lastError != "") return lastError;
+        
+    lastError = CHECK_RC(imageG_.Create(context_), "Create image generator");
+    if (lastError != "") return lastError;
 
     XnMapOutputMode mapMode;
     depthG_.GetMapOutputMode(mapMode);
@@ -55,19 +55,21 @@ int SkeletonSensor::initialize()
 
     depthG_.SetMapOutputMode(mapMode);
     imageG_.SetMapOutputMode(mapMode);
+    
+    /*
 
     // turn on device mirroring
     if(depthG_.IsCapabilitySupported("Mirror") == true)
     {
         rc = depthG_.GetMirrorCap().SetMirror(true);
-        CHECK_RC(rc, "Setting Image Mirroring on depthG");
+        CHECK_RC(rc, "Setting Image Mirroring on depthG", lastError);
     }
     
     // turn on device mirroring
     if(imageG_.IsCapabilitySupported("Mirror") == true)
     {
         rc = imageG_.GetMirrorCap().SetMirror(true);
-        CHECK_RC(rc, "Setting Image Mirroring on imageG");
+        CHECK_RC(rc, "Setting Image Mirroring on imageG", lastError);
     }
 
     // make sure the user points are reported from the POV of the depth generator
@@ -82,8 +84,9 @@ int SkeletonSensor::initialize()
 
     // setup callbacks
     setCalibrationPoseCallbacks();
+    */
 
-    return 0;
+    return "";
 }
 
 void SkeletonSensor::waitForDeviceUpdateOnUser()

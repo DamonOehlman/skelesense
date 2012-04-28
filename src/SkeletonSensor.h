@@ -4,6 +4,7 @@
 
 #include <XnCppWrapper.h>
 #include <vector>
+#include <string>
 
 // A 3D point with the confidence of the point's location. confidence_ > 0.5 is good
 struct SkeletonPoint
@@ -38,11 +39,13 @@ struct Skeleton
 class SkeletonSensor
 {
     public:
+        std::string *lastError;
+        
         SkeletonSensor();
         ~SkeletonSensor();
 
         // set up the device resolution and data generators
-        int initialize();
+        std::string initialize();
 
         // non-blocking wait for new data on the device
         void waitForDeviceUpdateOnUser();

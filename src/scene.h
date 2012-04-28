@@ -25,7 +25,9 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 struct DeviceBaton {
     uv_work_t request;
     v8::Persistent<v8::Function> callback;
+    
     SkeletonSensor *sensor;
+    std::string error_message;
 };
 
 class Scene : public node::ObjectWrap {
@@ -47,7 +49,7 @@ class Scene : public node::ObjectWrap {
     DeviceBaton* MakeBaton(v8::Persistent<v8::Function> callback);
       
     static v8::Handle<v8::Value> New(const v8::Arguments &args);
-    static v8::Handle<v8::Value> Connect(const v8::Arguments &args);
+    static v8::Handle<v8::Value> Init(const v8::Arguments &args);
     static v8::Handle<v8::Value> DetectUser(const v8::Arguments &args);
 };
 
