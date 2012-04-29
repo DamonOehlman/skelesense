@@ -19,11 +19,16 @@ inherits(skelesense.Scene, EventEmitter, {
     },
     
     capture: function() {
-        var cap = this.capture.bind(this);
+        var scene = this,
+            cap = this.capture.bind(this);
         
-        this._capture(function() {
-            console.log('captured', arguments);
+        this._capture(function(err) {
             
+            var users = Array.prototype.slice.call(arguments, 1);
+            
+            users.forEach(function(user) {
+                scene.emit('skeleton', user);
+            });
             
             process.nextTick(cap);
         });

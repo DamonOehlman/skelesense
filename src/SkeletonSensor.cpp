@@ -147,7 +147,20 @@ Skeleton SkeletonSensor::getSkeleton(const unsigned int uid)
     }
 
     // SkeletonPoint points[15];
-    convertXnJointsToPoints(positions, result.points, nJoints);
+    // convertXnJointsToPoints(positions, result.points, nJoints);
+    
+    for(unsigned int i = 0; i < nJoints; i++)  {
+        XnPoint3D xpt = positions[i].position;
+
+        if(pointModeProjective_)
+            depthG_.ConvertRealWorldToProjective(1, &xpt, &xpt);
+
+        result.points[i].confidence = positions[i].fConfidence;
+        result.points[i].x = xpt.X;
+        result.points[i].y = xpt.Y;
+        result.points[i].z = xpt.Z;
+    }
+    
     
     /*
     result.head              = points[0];
@@ -234,24 +247,6 @@ int SkeletonSensor::setCalibrationPoseCallbacks()
     userG_.GetSkeletonCap().SetSkeletonProfile(XN_SKEL_PROFILE_ALL);
 
     return 0;
-}
-
-void SkeletonSensor::convertXnJointsToPoints(XnSkeletonJointPosition* const joints, SkeletonPoint* const points, unsigned int numPoints)
-{
-    XnPoint3D xpt;
-
-    for(unsigned int i = 0; i < numPoints; i++)
-    {
-        xpt = joints[i].position;
-
-        if(pointModeProjective_)
-            depthG_.ConvertRealWorldToProjective(1, &xpt, &xpt);
-
-        points[i].confidence = joints[i].fConfidence;
-        points[i].x = xpt.X;
-        points[i].y = xpt.Y;
-        points[i].z = xpt.Z;
-    }
 }
 
 void XN_CALLBACK_TYPE SkeletonSensor::newUserCallback(xn::UserGenerator& generator, XnUserID nId, void* pCookie)
