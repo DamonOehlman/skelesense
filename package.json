@@ -6,7 +6,7 @@
     "kinect",
     "openni"
   ],
-  "version": "0.0.0",
+  "version": "0.0.1",
   "main": "skelesense",
   "engines": {
     "node": ">= 0.4.x < 0.7.0"
@@ -18,7 +18,7 @@
   "devDependencies": {
     "expect.js": "0.1.x",
     "mocha": "1.0.x"
- },
+  },
   "repository": {
     "type": "git",
     "url": "git://github.com/DamonOehlman/skelesense.git"
