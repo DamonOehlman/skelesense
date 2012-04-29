@@ -21,9 +21,29 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <node.h>
 #include <node_object_wrap.h>
 #include <string>
+#include <vector>
 
 #include <XnCppWrapper.h>
 #include "SkeletonSensor.h"
+
+const int NODETYPE_COUNT = 15;
+const std::string NODETYPES[NODETYPE_COUNT] = {
+    "head",
+    "neck",
+    "rightShoulder",
+    "leftShoulder",
+    "rightElbow",
+    "leftElbow",
+    "rightHand",
+    "leftHand",
+    "rightHip",
+    "leftHip",
+    "rightKnee",
+    "leftKnee",
+    "rightFoot",
+    "leftFoot",
+    "torso"
+};
 
 class Scene : public node::ObjectWrap {
   public:
@@ -34,12 +54,15 @@ class Scene : public node::ObjectWrap {
     xn::ImageGenerator imagegen;
     SkeletonSensor *sensor;
     
-    Skeleton users[];
-    unsigned userCount;
+    std::vector<Skeleton> users;
+    std::vector<unsigned int> uids;
+    unsigned int userCount;
 
     static v8::Persistent<v8::FunctionTemplate> constructor_template;
 
     static void Initialize(v8::Handle<v8::Object> target);
+    
+    v8::Handle<v8::Value> GetSkeleton(const unsigned index);
     
     // void Emit(int argc, v8::Handle<v8::Object> argv[]);
 

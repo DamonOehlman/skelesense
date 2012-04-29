@@ -75,9 +75,20 @@ void capture(uv_work_t* req) {
   
   sensor->waitForDeviceUpdateOnUser();
   
+  // initialise the user count and the user array
   scene->userCount = sensor->getNumTrackedUsers();
-  for (int ii = 0; ii < scene->userCount; ii++) {
-      scene->users[ii] =  sensor->getSkeleton(sensor->getUID(ii));
+  
+  // resize the user data if required
+  if (scene->users.size() != scene->userCount) {
+      scene->users.resize(scene->userCount);
+      scene->uids.resize(scene->userCount);
+  }
+  
+  for (unsigned int ii = 0; ii < scene->userCount; ii++) {
+      unsigned int uid = sensor->getUID(ii);
+      
+      scene->uids[ii] = uid;
+      scene->users[ii] = sensor->getSkeleton(uid);
   }
   
   // initialize the kinect
@@ -87,9 +98,10 @@ void capture(uv_work_t* req) {
 void captureResult(uv_work_t* req) {
     HandleScope scope;
     SceneBaton* baton = static_cast<SceneBaton*>(req->data);
+    Scene* scene = baton->scene;
     
-    unsigned argc = 1;
-    Local<Value> argv[] = { Local<Value>::New(Undefined()) };
+    unsigned int argc = scene->userCount + 1;
+    Local<Value> argv[argc];
     
     // if we captured an error, then update the callback parameter
     if (baton->error_message != "") {
@@ -97,6 +109,37 @@ void captureResult(uv_work_t* req) {
                 String::New(baton->error_message.c_str()));
                
         argv[0] = err;
+    }
+    else {
+        argv[0] = Local<Value>::New(Undefined());
+    }
+    
+    // pass through the skeleton data
+    for (unsigned int ii = 0; ii < scene->userCount; ii++) {
+        Persistent<Object> skel = Persistent<Object>::New(Object::New());
+        Skeleton data = scene->users[ii];
+        
+        // set the uid
+        skel->Set(String::NewSymbol("uid"), Integer::New(scene->uids[ii]));
+        
+        // iterate through node types and add the data to the 
+        for (int nodeIdx = 0; nodeIdx < NODETYPE_COUNT; nodeIdx++) {
+            // initialise the points array (x, y, z, _confidence)
+            Local<Array> pointData = Local<Array>::New(Array::New());
+            
+            // convert the point data to am array
+            pointData->Set(Integer::New(0), Integer::New(data.points[nodeIdx].x));
+            pointData->Set(Integer::New(1), Integer::New(data.points[nodeIdx].y));
+            pointData->Set(Integer::New(2), Integer::New(data.points[nodeIdx].z));
+            pointData->Set(Integer::New(3), Integer::New(data.points[nodeIdx].confidence));
+            
+            skel->Set(
+                String::NewSymbol(NODETYPES[nodeIdx].c_str()),
+                pointData
+            );
+        }
+
+        argv[ii + 1] = Local<Value>::New(skel);
     }
     
     // fire the callback

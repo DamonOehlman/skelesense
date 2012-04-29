@@ -14,6 +14,7 @@ struct SkeletonPoint
 
 struct Skeleton
 {
+    SkeletonPoint points[15];
     SkeletonPoint head;
     SkeletonPoint neck;
     SkeletonPoint rightShoulder;

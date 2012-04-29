@@ -22,7 +22,7 @@ inherits(skelesense.Scene, EventEmitter, {
         var cap = this.capture.bind(this);
         
         this._capture(function() {
-            console.log('captured');
+            console.log('captured', arguments);
             
             
             process.nextTick(cap);

@@ -146,9 +146,10 @@ Skeleton SkeletonSensor::getSkeleton(const unsigned int uid)
         userG_.GetSkeletonCap().GetSkeletonJointPosition(uid, joints[i], *(positions+i));
     }
 
-    SkeletonPoint points[15];
-    convertXnJointsToPoints(positions, points, nJoints);
-
+    // SkeletonPoint points[15];
+    convertXnJointsToPoints(positions, result.points, nJoints);
+    
+    /*
     result.head              = points[0];
     result.neck              = points[1];
     result.rightShoulder     = points[2];
@@ -164,6 +165,7 @@ Skeleton SkeletonSensor::getSkeleton(const unsigned int uid)
     result.rightFoot         = points[12];
     result.leftFoot          = points[13];
     result.torso             = points[14];
+    */
 
     return result;
 }
