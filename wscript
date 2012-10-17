@@ -16,5 +16,5 @@ def build(bld):
     obj.cxxflags = ["-g", "-D_FILE_OFFSET_BITS=64", "-D_LARGEFILE_SOURCE", "-Wall", "-I/usr/include/ni"]
     obj.target = "skelesense"
     obj.source = "src/log.cpp src/SkeletonSensor.cpp src/nitools.cpp src/scene.cc src/skelesense.cc"
-    obj.linkflags = ['-lopenni']
+    obj.linkflags = ['-lOpenNI']
     obj.uselib = ['LIBOPENNI']
