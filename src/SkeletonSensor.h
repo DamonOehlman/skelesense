@@ -79,6 +79,8 @@ class SkeletonSensor
         const XnUInt8* getImageData();
         const XnLabel*     getLabels();
 
+        xn::UserGenerator getUserGenerator();
+
     private:
         xn::Context context_;
         xn::DepthGenerator depthG_;

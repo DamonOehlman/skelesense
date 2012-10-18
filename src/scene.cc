@@ -18,6 +18,7 @@
 #include "scene.h"
 #include "nitools.h"
 #include "SkeletonSensor.h"
+#include "log.h"
 
 static v8::Persistent<v8::String> emit_symbol = NODE_PSYMBOL("emit");
 
@@ -46,11 +47,11 @@ void XN_CALLBACK_TYPE newUserCallback(xn::UserGenerator& generator, XnUserID nId
 }
 
 void XN_CALLBACK_TYPE lostUserCallback(xn::UserGenerator& generator, XnUserID nId, void* pCookie) {
-    // put_flog(LOG_DEBUG, "Lost user %d", nId);
+     put_flog(LOG_DEBUG, "Lost user %d", nId);
 }
 
 void XN_CALLBACK_TYPE calibrationStartCallback(xn::SkeletonCapability& capability, XnUserID nId, void* pCookie) {
-    // put_flog(LOG_DEBUG, "Calibration started for user %d", nId);
+     put_flog(LOG_DEBUG, "Calibration started for user %d", nId);
 }
 
 void XN_CALLBACK_TYPE calibrationCompleteCallback(xn::SkeletonCapability& capability, XnUserID nId, XnCalibrationStatus eStatus, void* pCookie) {
@@ -228,13 +229,16 @@ void startSensor(uv_work_t* req) {
 void watchForUsers(uv_work_t* req) {
     SceneBaton* baton = static_cast<SceneBaton*>(req->data);
     Scene* scene = baton->scene;
-
     XnCallbackHandle hUserCallbacks, hCalibrationStart, hCalibrationComplete;
     
     // start data streams
     scene->context.StartGeneratingAll();
 
-    scene->usergen.RegisterUserCallbacks(
+   	if (!scene->usergen) {
+		//If usergen is NULL, get it from the skeleton sensor
+  		scene->usergen = scene->sensor->getUserGenerator();
+	}
+	scene->usergen.RegisterUserCallbacks(
         newUserCallback, 
         lostUserCallback, 
         scene, 
@@ -287,7 +291,7 @@ void errorCheck(uv_work_t* req) {
 Persistent<FunctionTemplate> Scene::constructor_template;
 
 Scene::~Scene() {
-    context.Shutdown();
+    context.Release();
 }
 
 Scene* Scene::New() {
