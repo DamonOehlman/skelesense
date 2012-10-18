@@ -23,7 +23,11 @@ SkeletonSensor::SkeletonSensor()
 
 SkeletonSensor::~SkeletonSensor()
 {
-    context_.Shutdown();
+    context_.Release();
+}
+
+xn::UserGenerator SkeletonSensor::getUserGenerator() {
+	return userG_;
 }
 
 std::string SkeletonSensor::initialize()
