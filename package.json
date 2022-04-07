@@ -12,7 +12,7 @@
     "node": ">= 0.4.x < 0.7.0"
   },
   "dependencies": {
-    "async": "0.1.x",
+    "async": "3.2.2",
     "inherits": "1.0.x"
   },
   "devDependencies": {
